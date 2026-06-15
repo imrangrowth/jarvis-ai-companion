@@ -179,7 +179,7 @@ function JARVIS() {
   const [thinking, setThinking] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [status, setStatus] = useState("SYSTEMS ONLINE");
-  const [time, setTime] = useState(new Date());
+  const [time, setTime] = useState<Date | null>(null);
   const [energy, setEnergy] = useState(94);
   const [showChat, setShowChat] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -198,6 +198,7 @@ function JARVIS() {
   }, []);
 
   useEffect(() => {
+    setTime(new Date());
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -362,7 +363,7 @@ function JARVIS() {
             fontFamily: "'Orbitron', monospace", fontSize: 13, color: "#00d4ff",
             letterSpacing: 3, animation: "pulse 3s ease-in-out infinite"
           }}>
-            {time.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            {time ? time.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "--:--:--"}
           </div>
           <div style={{ fontSize: 10, color: "#1a6a8a", letterSpacing: 2 }}>STARK IND.</div>
         </div>
