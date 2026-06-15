@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { askJarvis } from "@/lib/jarvis.functions";
 
 export const Route = createFileRoute("/")({
   component: JARVIS,
@@ -211,6 +213,8 @@ function JARVIS() {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [messages]);
 
+  const askJarvisFn = useServerFn(askJarvis);
+
   const callJarvis = useCallback(async (userText: string) => {
     if (!userText.trim()) return;
 
@@ -220,31 +224,11 @@ function JARVIS() {
     setStatus("PROCESSING...");
 
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          system: JARVIS_SYSTEM,
-          messages: newMessages
-        })
-      });
-
-      const data = await res.json();
-
-      if (data.error) {
-        const errMsg = "I'm afraid there's an issue with the connection, sir. Please verify the API configuration.";
-        setMessages(prev => [...prev, { role: "assistant", content: errMsg }]);
-        if (voiceEnabled) speak(errMsg);
-        setStatus("CONNECTION ERROR");
-        return;
-      }
-
-      const reply = data.content?.[0]?.text || "I seem to be experiencing a minor anomaly, sir.";
+      const data = await askJarvisFn({ data: { messages: newMessages } });
+      const reply = data.reply;
       const updated: Message[] = [...newMessages, { role: "assistant", content: reply }];
       setMessages(updated);
-      setStatus("RESPONSE READY");
+      setStatus(data.source === "anthropic" ? "RESPONSE READY" : "RESPONSE READY · FALLBACK");
 
       if (voiceEnabled) {
         setSpeaking(true);
@@ -255,7 +239,8 @@ function JARVIS() {
       } else {
         setStatus("SYSTEMS ONLINE");
       }
-    } catch {
+    } catch (e) {
+      console.error(e);
       const errMsg = "Network anomaly detected, sir. Please check your connection.";
       setMessages(prev => [...prev, { role: "assistant", content: errMsg }]);
       if (voiceEnabled) speak(errMsg);
@@ -263,7 +248,7 @@ function JARVIS() {
     } finally {
       setThinking(false);
     }
-  }, [messages, voiceEnabled]);
+  }, [messages, voiceEnabled, askJarvisFn]);
 
   const startListening = useCallback(() => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
