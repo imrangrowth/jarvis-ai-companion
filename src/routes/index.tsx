@@ -697,7 +697,10 @@ function JARVIS() {
       pendingRef.current = intent;
       setPendingAction(intent);
       const msg = `I've detected a ${intent.action} command to ${intent.contact || intent.number}, sir. Execute?`;
-      if (voiceOn) (elevenKey ? speakElevenLabs(msg, elevenKey) : speakFallback(msg));
+      if (voiceOn) {
+        if (elevenKey) speakElevenLabs(msg, elevenKey);
+        else speakElevenLabsServer(msg, synthesizeSpeechFn);
+      }
       setState("idle");
       return;
     }
@@ -717,7 +720,7 @@ function JARVIS() {
     }
 
     await respondAsJarvisCore(null, newMsgs);
-  }, [state, messages, location, voiceOn, elevenKey, addMemoryEntry, finishWithVoice, handleApiError, respondAsJarvisCore, routeIntentFn, chatAgenticFn, buildWebsiteFn]);
+  }, [state, messages, location, voiceOn, elevenKey, synthesizeSpeechFn, addMemoryEntry, finishWithVoice, handleApiError, respondAsJarvisCore, routeIntentFn, chatAgenticFn, buildWebsiteFn]);
 
   // Voice input
   const startListening = useCallback(() => {
