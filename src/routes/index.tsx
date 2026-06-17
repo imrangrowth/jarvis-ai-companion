@@ -450,6 +450,70 @@ function MemoryPanel({ memory, onAdd, onDelete }: {
 }
 
 // ══════════════════════════════════════════════════════════
+//  LIVE WORKSPACE — full-screen split view during builds/agents
+// ══════════════════════════════════════════════════════════
+type Workspace = {
+  task: string;
+  agent: string;
+  html?: string;
+  htmlProgress?: string;
+  textProgress?: string;
+  done?: boolean;
+};
+
+function LiveWorkspace({ ws, onClose }: { ws: Workspace; onClose: () => void }) {
+  const textRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (textRef.current) textRef.current.scrollTop = textRef.current.scrollHeight; }, [ws.textProgress, ws.htmlProgress]);
+  const isHtmlBuild = ws.agent === "builder";
+  const meta = AGENT_META[ws.agent] || AGENT_META.jarvis;
+  const color = meta.color;
+
+  return (
+    <div style={{
+      position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+      background: "radial-gradient(ellipse at 20% 10%,#001525 0%,#000812 50%,#000000 100%)",
+      display: "flex", flexDirection: "column",
+      fontFamily: "'Share Tech Mono',monospace", color: "#4fc3f7", zIndex: 9999, overflow: "hidden",
+    }}>
+      <div style={{ padding: 14, background: "linear-gradient(135deg,rgba(0,16,32,0.97),rgba(0,8,18,0.99))", borderBottom: `1px solid ${color}33`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontSize: 8, color, letterSpacing: 2, marginBottom: 4 }}>{meta.icon} {meta.label} — {ws.done ? "COMPLETE" : "LIVE CONSTRUCTION"}</div>
+          <div style={{ fontSize: 11, color: "#b0c8d8", maxWidth: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ws.task}</div>
+        </div>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "#ff6677", fontSize: 18, cursor: "pointer" }}>✕</button>
+      </div>
+
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", borderRight: isHtmlBuild ? "1px solid #0a2a44" : "none", overflow: "hidden" }}>
+          <div style={{ padding: 10, fontSize: 8, color: "#0a5070", letterSpacing: 2, borderBottom: "1px solid #0a2a44" }}>{isHtmlBuild ? "CODE STREAM" : "OUTPUT"}</div>
+          <div ref={textRef} style={{
+            flex: 1, overflow: "auto", padding: 12, background: "rgba(0,0,0,0.4)",
+            fontSize: 11, color: "#81d4fa", fontFamily: "'Share Tech Mono',monospace",
+            lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
+          }}>
+            {isHtmlBuild ? ws.htmlProgress : ws.textProgress}
+            {!ws.done && <span style={{ color, animation: "blinkCursor 0.8s step-end infinite" }}>▋</span>}
+          </div>
+        </div>
+
+        {isHtmlBuild && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ padding: 10, fontSize: 8, color: "#0a5070", letterSpacing: 2, borderBottom: "1px solid #0a2a44" }}>LIVE PREVIEW</div>
+            <iframe srcDoc={ws.html || ws.htmlProgress || "<html><body style='background:#000;color:#0a5070;font-family:monospace;padding:20px'>Awaiting render…</body></html>"}
+              sandbox="allow-scripts" title="Live preview"
+              style={{ flex: 1, border: "none", background: "#fff" }} />
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: 10, borderTop: `1px solid ${color}33`, background: "linear-gradient(135deg,rgba(0,8,18,0.99),rgba(0,16,32,0.97))", textAlign: "center", fontSize: 9, color, letterSpacing: 1, animation: ws.done ? "none" : "pulse 1.5s ease-in-out infinite" }}>
+        {ws.done ? "READY — TAP ✕ TO CLOSE" : (isHtmlBuild ? "RENDERING WEBSITE..." : "PROCESSING...")}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 //  MAIN COMPONENT
 // ══════════════════════════════════════════════════════════
 type ChatMessage = { role: "user" | "assistant"; content: string; agent?: string; searches?: string[] };
@@ -477,6 +541,7 @@ function JARVIS() {
   const [textInput, setTextInput] = useState("");
   const [pendingImage, setPendingImage] = useState<{ mediaType: string; data: string; previewUrl: string } | null>(null);
   const [time, setTime] = useState<Date | null>(null);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
 
   const recRef = useRef<any>(null);
   const liveRef = useRef("");
@@ -665,29 +730,68 @@ function JARVIS() {
     // Specialist agent
     if (intent.action === "agent" && AGENTS[intent.agent]) {
       setActiveAgent(intent.agent);
+      setWorkspace({ task: intent.task || userText, agent: intent.agent, textProgress: "" });
       try {
         const memCtx = buildMemoryContext(memoryRef.current);
         const sys = `${JARVIS_SYSTEM}\n\n${AGENTS[intent.agent].prompt}\n\n${memCtx}`;
         const apiMsgs: ApiMessage[] = newMsgs.map((m) => ({ role: m.role, content: m.content }));
         setState("thinking");
+
+        // Animated progress lines while the agent works
+        const progressLines = [
+          "Initiating analysis...",
+          "Scanning sources...",
+          "Synthesizing data...",
+          "Generating insights...",
+          "Finalizing report...",
+        ];
+        let killed = false;
+        (async () => {
+          for (const line of progressLines) {
+            if (killed) return;
+            setWorkspace((p) => p ? ({ ...p, textProgress: (p.textProgress || "") + line + "\n" }) : p);
+            await new Promise((r) => setTimeout(r, 450));
+          }
+        })();
+
         const { reply, searches } = await chatAgenticFn({ data: { system: sys, messages: apiMsgs, useTools: true } });
+        killed = true;
+        setWorkspace((p) => p ? ({ ...p, textProgress: (p.textProgress || "") + "\n— RESPONSE —\n" + reply, done: true }) : p);
         setMessages((prev) => [...prev, { role: "assistant", content: reply, agent: intent.agent, searches }]);
         finishWithVoice(reply);
-      } catch { handleApiError(); }
+      } catch { setWorkspace(null); handleApiError(); }
       return;
     }
 
-    // Builder
+    // Builder — live workspace with streaming HTML preview
     if (intent.action === "build_website") {
       setActiveAgent("builder");
       setState("building");
+      const description = intent.description || userText;
+      const skeleton = "<!doctype html><html><head><style>body{background:#0a0a0f;color:#0ff;font-family:monospace;padding:32px}h1{color:#fb923c}.dot{animation:b 1s infinite}@keyframes b{50%{opacity:.3}}</style></head><body><h1>Constructing site<span class=\"dot\">...</span></h1><p>Description: " + description.slice(0, 200) + "</p></body></html>";
+      setWorkspace({ task: description, agent: "builder", html: skeleton, htmlProgress: skeleton, textProgress: "" });
+
+      // Stream a placeholder skeleton character-by-character for feedback
+      let killed = false;
+      (async () => {
+        let acc = "";
+        for (const ch of skeleton) {
+          if (killed) return;
+          acc += ch;
+          setWorkspace((p) => p ? ({ ...p, htmlProgress: acc }) : p);
+          if (acc.length % 8 === 0) await new Promise((r) => setTimeout(r, 8));
+        }
+      })();
+
       try {
         const memCtx = buildMemoryContext(memoryRef.current);
-        const { html, summary } = await buildWebsiteFn({ data: { description: intent.description || userText, memoryContext: memCtx } });
+        const { html, summary } = await buildWebsiteFn({ data: { description, memoryContext: memCtx } });
+        killed = true;
+        setWorkspace({ task: description, agent: "builder", html, htmlProgress: html, textProgress: summary, done: true });
         setWebsiteResult({ html, summary });
         setMessages((prev) => [...prev, { role: "assistant", content: summary, agent: "builder" }]);
         finishWithVoice(summary);
-      } catch { handleApiError(); }
+      } catch { setWorkspace(null); handleApiError(); }
       return;
     }
 
@@ -755,6 +859,7 @@ function JARVIS() {
 
   return (
     <>
+      {workspace && <LiveWorkspace ws={workspace} onClose={() => setWorkspace(null)} />}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
