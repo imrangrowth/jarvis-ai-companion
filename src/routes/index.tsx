@@ -450,6 +450,70 @@ function MemoryPanel({ memory, onAdd, onDelete }: {
 }
 
 // ══════════════════════════════════════════════════════════
+//  LIVE WORKSPACE — full-screen split view during builds/agents
+// ══════════════════════════════════════════════════════════
+type Workspace = {
+  task: string;
+  agent: string;
+  html?: string;
+  htmlProgress?: string;
+  textProgress?: string;
+  done?: boolean;
+};
+
+function LiveWorkspace({ ws, onClose }: { ws: Workspace; onClose: () => void }) {
+  const textRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (textRef.current) textRef.current.scrollTop = textRef.current.scrollHeight; }, [ws.textProgress, ws.htmlProgress]);
+  const isHtmlBuild = ws.agent === "builder";
+  const meta = AGENT_META[ws.agent] || AGENT_META.jarvis;
+  const color = meta.color;
+
+  return (
+    <div style={{
+      position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+      background: "radial-gradient(ellipse at 20% 10%,#001525 0%,#000812 50%,#000000 100%)",
+      display: "flex", flexDirection: "column",
+      fontFamily: "'Share Tech Mono',monospace", color: "#4fc3f7", zIndex: 9999, overflow: "hidden",
+    }}>
+      <div style={{ padding: 14, background: "linear-gradient(135deg,rgba(0,16,32,0.97),rgba(0,8,18,0.99))", borderBottom: `1px solid ${color}33`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontSize: 8, color, letterSpacing: 2, marginBottom: 4 }}>{meta.icon} {meta.label} — {ws.done ? "COMPLETE" : "LIVE CONSTRUCTION"}</div>
+          <div style={{ fontSize: 11, color: "#b0c8d8", maxWidth: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ws.task}</div>
+        </div>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "#ff6677", fontSize: 18, cursor: "pointer" }}>✕</button>
+      </div>
+
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", borderRight: isHtmlBuild ? "1px solid #0a2a44" : "none", overflow: "hidden" }}>
+          <div style={{ padding: 10, fontSize: 8, color: "#0a5070", letterSpacing: 2, borderBottom: "1px solid #0a2a44" }}>{isHtmlBuild ? "CODE STREAM" : "OUTPUT"}</div>
+          <div ref={textRef} style={{
+            flex: 1, overflow: "auto", padding: 12, background: "rgba(0,0,0,0.4)",
+            fontSize: 11, color: "#81d4fa", fontFamily: "'Share Tech Mono',monospace",
+            lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
+          }}>
+            {isHtmlBuild ? ws.htmlProgress : ws.textProgress}
+            {!ws.done && <span style={{ color, animation: "blinkCursor 0.8s step-end infinite" }}>▋</span>}
+          </div>
+        </div>
+
+        {isHtmlBuild && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ padding: 10, fontSize: 8, color: "#0a5070", letterSpacing: 2, borderBottom: "1px solid #0a2a44" }}>LIVE PREVIEW</div>
+            <iframe srcDoc={ws.html || ws.htmlProgress || "<html><body style='background:#000;color:#0a5070;font-family:monospace;padding:20px'>Awaiting render…</body></html>"}
+              sandbox="allow-scripts" title="Live preview"
+              style={{ flex: 1, border: "none", background: "#fff" }} />
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: 10, borderTop: `1px solid ${color}33`, background: "linear-gradient(135deg,rgba(0,8,18,0.99),rgba(0,16,32,0.97))", textAlign: "center", fontSize: 9, color, letterSpacing: 1, animation: ws.done ? "none" : "pulse 1.5s ease-in-out infinite" }}>
+        {ws.done ? "READY — TAP ✕ TO CLOSE" : (isHtmlBuild ? "RENDERING WEBSITE..." : "PROCESSING...")}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 //  MAIN COMPONENT
 // ══════════════════════════════════════════════════════════
 type ChatMessage = { role: "user" | "assistant"; content: string; agent?: string; searches?: string[] };
