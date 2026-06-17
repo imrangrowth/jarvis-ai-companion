@@ -859,6 +859,7 @@ function JARVIS() {
 
   return (
     <>
+      {workspace && <LiveWorkspace ws={workspace} onClose={() => setWorkspace(null)} />}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
