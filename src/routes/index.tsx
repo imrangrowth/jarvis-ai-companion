@@ -730,29 +730,68 @@ function JARVIS() {
     // Specialist agent
     if (intent.action === "agent" && AGENTS[intent.agent]) {
       setActiveAgent(intent.agent);
+      setWorkspace({ task: intent.task || userText, agent: intent.agent, textProgress: "" });
       try {
         const memCtx = buildMemoryContext(memoryRef.current);
         const sys = `${JARVIS_SYSTEM}\n\n${AGENTS[intent.agent].prompt}\n\n${memCtx}`;
         const apiMsgs: ApiMessage[] = newMsgs.map((m) => ({ role: m.role, content: m.content }));
         setState("thinking");
+
+        // Animated progress lines while the agent works
+        const progressLines = [
+          "Initiating analysis...",
+          "Scanning sources...",
+          "Synthesizing data...",
+          "Generating insights...",
+          "Finalizing report...",
+        ];
+        let killed = false;
+        (async () => {
+          for (const line of progressLines) {
+            if (killed) return;
+            setWorkspace((p) => p ? ({ ...p, textProgress: (p.textProgress || "") + line + "\n" }) : p);
+            await new Promise((r) => setTimeout(r, 450));
+          }
+        })();
+
         const { reply, searches } = await chatAgenticFn({ data: { system: sys, messages: apiMsgs, useTools: true } });
+        killed = true;
+        setWorkspace((p) => p ? ({ ...p, textProgress: (p.textProgress || "") + "\n— RESPONSE —\n" + reply, done: true }) : p);
         setMessages((prev) => [...prev, { role: "assistant", content: reply, agent: intent.agent, searches }]);
         finishWithVoice(reply);
-      } catch { handleApiError(); }
+      } catch { setWorkspace(null); handleApiError(); }
       return;
     }
 
-    // Builder
+    // Builder — live workspace with streaming HTML preview
     if (intent.action === "build_website") {
       setActiveAgent("builder");
       setState("building");
+      const description = intent.description || userText;
+      const skeleton = "<!doctype html><html><head><style>body{background:#0a0a0f;color:#0ff;font-family:monospace;padding:32px}h1{color:#fb923c}.dot{animation:b 1s infinite}@keyframes b{50%{opacity:.3}}</style></head><body><h1>Constructing site<span class=\"dot\">...</span></h1><p>Description: " + description.slice(0, 200) + "</p></body></html>";
+      setWorkspace({ task: description, agent: "builder", html: skeleton, htmlProgress: skeleton, textProgress: "" });
+
+      // Stream a placeholder skeleton character-by-character for feedback
+      let killed = false;
+      (async () => {
+        let acc = "";
+        for (const ch of skeleton) {
+          if (killed) return;
+          acc += ch;
+          setWorkspace((p) => p ? ({ ...p, htmlProgress: acc }) : p);
+          if (acc.length % 8 === 0) await new Promise((r) => setTimeout(r, 8));
+        }
+      })();
+
       try {
         const memCtx = buildMemoryContext(memoryRef.current);
-        const { html, summary } = await buildWebsiteFn({ data: { description: intent.description || userText, memoryContext: memCtx } });
+        const { html, summary } = await buildWebsiteFn({ data: { description, memoryContext: memCtx } });
+        killed = true;
+        setWorkspace({ task: description, agent: "builder", html, htmlProgress: html, textProgress: summary, done: true });
         setWebsiteResult({ html, summary });
         setMessages((prev) => [...prev, { role: "assistant", content: summary, agent: "builder" }]);
         finishWithVoice(summary);
-      } catch { handleApiError(); }
+      } catch { setWorkspace(null); handleApiError(); }
       return;
     }
 
