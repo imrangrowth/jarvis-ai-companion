@@ -541,6 +541,7 @@ function JARVIS() {
   const [textInput, setTextInput] = useState("");
   const [pendingImage, setPendingImage] = useState<{ mediaType: string; data: string; previewUrl: string } | null>(null);
   const [time, setTime] = useState<Date | null>(null);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
 
   const recRef = useRef<any>(null);
   const liveRef = useRef("");
