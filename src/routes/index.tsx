@@ -490,6 +490,7 @@ function JARVIS() {
   const routeIntentFn = useServerFn(routeIntent);
   const chatAgenticFn = useServerFn(chatAgentic);
   const buildWebsiteFn = useServerFn(buildWebsite);
+  const synthesizeSpeechFn = useServerFn(synthesizeSpeech);
 
   const color = STATE_COLORS[state] || "#00d4ff";
 
@@ -531,16 +532,17 @@ function JARVIS() {
     });
   }, []);
 
-  // Voice output
+  // Voice output: user key > server secret > browser TTS
   const finishWithVoice = useCallback((text: string) => {
     if (voiceOn) {
       setState("speaking");
       const done = () => { setState("idle"); setSearchQuery(""); };
-      elevenKey ? speakElevenLabs(text, elevenKey, done) : speakFallback(text, done);
+      if (elevenKey) speakElevenLabs(text, elevenKey, done);
+      else speakElevenLabsServer(text, synthesizeSpeechFn, done);
     } else {
       setState("idle");
     }
-  }, [voiceOn, elevenKey]);
+  }, [voiceOn, elevenKey, synthesizeSpeechFn]);
 
   const handleApiError = useCallback(() => {
     const err = "System anomaly detected, sir. Please verify connectivity.";
