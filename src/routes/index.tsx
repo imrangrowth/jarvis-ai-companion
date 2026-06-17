@@ -5,6 +5,7 @@ import {
   routeIntent,
   chatAgentic,
   buildWebsite,
+  synthesizeSpeech,
   type ApiMessage,
 } from "@/lib/jarvis.functions";
 
@@ -135,6 +136,19 @@ async function speakElevenLabs(text: string, key: string, onEnd?: () => void) {
     const audio = new Audio(url);
     audio.onended = () => { URL.revokeObjectURL(url); onEnd?.(); };
     audio.play();
+  } catch { speakFallback(text, onEnd); }
+}
+
+async function speakElevenLabsServer(
+  text: string,
+  synth: (args: { data: { text: string } }) => Promise<{ audioBase64: string; mimeType: string }>,
+  onEnd?: () => void,
+) {
+  try {
+    const { audioBase64, mimeType } = await synth({ data: { text } });
+    const audio = new Audio(`data:${mimeType};base64,${audioBase64}`);
+    audio.onended = () => onEnd?.();
+    await audio.play();
   } catch { speakFallback(text, onEnd); }
 }
 
