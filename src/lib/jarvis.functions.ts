@@ -212,8 +212,8 @@ export const chatAgentic = createServerFn({ method: "POST" })
       return { reply: "Search cycle limit reached, sir.", searches, source: "anthropic" as const };
     } catch (e) {
       console.error("Anthropic failed, falling back:", e);
-      const reply = await lovableCall(system, messages);
-      return { reply, searches, source: "lovable" as const };
+      const { reply, source } = await chainedFallback(system, messages);
+      return { reply, searches, source };
     }
   });
 
@@ -242,7 +242,7 @@ export const buildWebsite = createServerFn({ method: "POST" })
       return { html, summary };
     } catch (e) {
       console.error("Builder anthropic failed, fallback:", e);
-      const reply = await lovableCall(system, [{ role: "user", content: data.description }]);
+      const { reply } = await chainedFallback(system, [{ role: "user", content: data.description }]);
       const match = reply.match(/```(?:html)?\s*([\s\S]*?)```/i);
       const html = match ? match[1].trim() : reply.trim();
       const summary =
@@ -263,7 +263,7 @@ export const askJarvis = createServerFn({ method: "POST" })
       if (text) return { reply: text, source: "anthropic" as const };
       throw new Error("empty");
     } catch {
-      const reply = await lovableCall(system, data.messages);
-      return { reply, source: "lovable" as const };
+      const { reply, source } = await chainedFallback(system, data.messages);
+      return { reply, source };
     }
   });
