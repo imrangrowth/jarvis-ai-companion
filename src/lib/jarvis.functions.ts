@@ -36,6 +36,72 @@ async function anthropicCall(body: Record<string, unknown>): Promise<any> {
   throw new Error(`Anthropic failed: ${lastErr}`);
 }
 
+// ── Google Gemini direct fallback ─────────────────────────────────────────
+async function geminiCall(system: string, messages: ApiMessage[]): Promise<string> {
+  const key = process.env.GOOGLE_AI_API_KEY;
+  if (!key) throw new Error("NO_GEMINI");
+  const contents = messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{
+      text: typeof m.content === "string"
+        ? m.content
+        : m.content.map((b) => (b.type === "text" ? b.text : "[image attached]")).join("\n"),
+    }],
+  }));
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents,
+      }),
+    },
+  );
+  if (!r.ok) throw new Error(`Gemini ${r.status}: ${await r.text()}`);
+  const j = await r.json();
+  return j.candidates?.[0]?.content?.parts?.[0]?.text ?? "Anomaly detected, sir.";
+}
+
+async function chainedFallback(system: string, messages: ApiMessage[]): Promise<{ reply: string; source: "gemini" | "lovable" }> {
+  try {
+    const reply = await geminiCall(system, messages);
+    return { reply, source: "gemini" };
+  } catch (e) {
+    console.error("Gemini failed, trying Lovable:", e);
+    const reply = await lovableCall(system, messages);
+    return { reply, source: "lovable" };
+  }
+}
+
+// ── ElevenLabs TTS (server-side, uses secret) ─────────────────────────────
+const DEFAULT_VOICE_ID = "onwK4e9ZLuTAKqWW03F9"; // Daniel — British
+
+export const synthesizeSpeech = createServerFn({ method: "POST" })
+  .inputValidator((data: { text: string; voiceId?: string }) => data)
+  .handler(async ({ data }) => {
+    const key = process.env.ELEVENLABS_API_KEY;
+    if (!key) throw new Error("ELEVENLABS_API_KEY not configured");
+    const voiceId = data.voiceId || DEFAULT_VOICE_ID;
+    const r = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+      {
+        method: "POST",
+        headers: { "xi-api-key": key, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: data.text,
+          model_id: "eleven_turbo_v2_5",
+          voice_settings: { stability: 0.55, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true },
+        }),
+      },
+    );
+    if (!r.ok) throw new Error(`ElevenLabs ${r.status}: ${await r.text()}`);
+    const buf = await r.arrayBuffer();
+    const base64 = Buffer.from(buf).toString("base64");
+    return { audioBase64: base64, mimeType: "audio/mpeg" };
+  });
+
 async function lovableCall(system: string, messages: ApiMessage[]): Promise<string> {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("NO_LOVABLE");
@@ -146,8 +212,8 @@ export const chatAgentic = createServerFn({ method: "POST" })
       return { reply: "Search cycle limit reached, sir.", searches, source: "anthropic" as const };
     } catch (e) {
       console.error("Anthropic failed, falling back:", e);
-      const reply = await lovableCall(system, messages);
-      return { reply, searches, source: "lovable" as const };
+      const { reply, source } = await chainedFallback(system, messages);
+      return { reply, searches, source };
     }
   });
 
@@ -176,7 +242,7 @@ export const buildWebsite = createServerFn({ method: "POST" })
       return { html, summary };
     } catch (e) {
       console.error("Builder anthropic failed, fallback:", e);
-      const reply = await lovableCall(system, [{ role: "user", content: data.description }]);
+      const { reply } = await chainedFallback(system, [{ role: "user", content: data.description }]);
       const match = reply.match(/```(?:html)?\s*([\s\S]*?)```/i);
       const html = match ? match[1].trim() : reply.trim();
       const summary =
@@ -197,7 +263,7 @@ export const askJarvis = createServerFn({ method: "POST" })
       if (text) return { reply: text, source: "anthropic" as const };
       throw new Error("empty");
     } catch {
-      const reply = await lovableCall(system, data.messages);
-      return { reply, source: "lovable" as const };
+      const { reply, source } = await chainedFallback(system, data.messages);
+      return { reply, source };
     }
   });

@@ -5,6 +5,7 @@ import {
   routeIntent,
   chatAgentic,
   buildWebsite,
+  synthesizeSpeech,
   type ApiMessage,
 } from "@/lib/jarvis.functions";
 
@@ -135,6 +136,19 @@ async function speakElevenLabs(text: string, key: string, onEnd?: () => void) {
     const audio = new Audio(url);
     audio.onended = () => { URL.revokeObjectURL(url); onEnd?.(); };
     audio.play();
+  } catch { speakFallback(text, onEnd); }
+}
+
+async function speakElevenLabsServer(
+  text: string,
+  synth: (args: { data: { text: string } }) => Promise<{ audioBase64: string; mimeType: string }>,
+  onEnd?: () => void,
+) {
+  try {
+    const { audioBase64, mimeType } = await synth({ data: { text } });
+    const audio = new Audio(`data:${mimeType};base64,${audioBase64}`);
+    audio.onended = () => onEnd?.();
+    await audio.play();
   } catch { speakFallback(text, onEnd); }
 }
 
@@ -476,6 +490,7 @@ function JARVIS() {
   const routeIntentFn = useServerFn(routeIntent);
   const chatAgenticFn = useServerFn(chatAgentic);
   const buildWebsiteFn = useServerFn(buildWebsite);
+  const synthesizeSpeechFn = useServerFn(synthesizeSpeech);
 
   const color = STATE_COLORS[state] || "#00d4ff";
 
@@ -517,16 +532,17 @@ function JARVIS() {
     });
   }, []);
 
-  // Voice output
+  // Voice output: user key > server secret > browser TTS
   const finishWithVoice = useCallback((text: string) => {
     if (voiceOn) {
       setState("speaking");
       const done = () => { setState("idle"); setSearchQuery(""); };
-      elevenKey ? speakElevenLabs(text, elevenKey, done) : speakFallback(text, done);
+      if (elevenKey) speakElevenLabs(text, elevenKey, done);
+      else speakElevenLabsServer(text, synthesizeSpeechFn, done);
     } else {
       setState("idle");
     }
-  }, [voiceOn, elevenKey]);
+  }, [voiceOn, elevenKey, synthesizeSpeechFn]);
 
   const handleApiError = useCallback(() => {
     const err = "System anomaly detected, sir. Please verify connectivity.";
@@ -681,7 +697,10 @@ function JARVIS() {
       pendingRef.current = intent;
       setPendingAction(intent);
       const msg = `I've detected a ${intent.action} command to ${intent.contact || intent.number}, sir. Execute?`;
-      if (voiceOn) (elevenKey ? speakElevenLabs(msg, elevenKey) : speakFallback(msg));
+      if (voiceOn) {
+        if (elevenKey) speakElevenLabs(msg, elevenKey);
+        else speakElevenLabsServer(msg, synthesizeSpeechFn);
+      }
       setState("idle");
       return;
     }
@@ -701,7 +720,7 @@ function JARVIS() {
     }
 
     await respondAsJarvisCore(null, newMsgs);
-  }, [state, messages, location, voiceOn, elevenKey, addMemoryEntry, finishWithVoice, handleApiError, respondAsJarvisCore, routeIntentFn, chatAgenticFn, buildWebsiteFn]);
+  }, [state, messages, location, voiceOn, elevenKey, synthesizeSpeechFn, addMemoryEntry, finishWithVoice, handleApiError, respondAsJarvisCore, routeIntentFn, chatAgenticFn, buildWebsiteFn]);
 
   // Voice input
   const startListening = useCallback(() => {
