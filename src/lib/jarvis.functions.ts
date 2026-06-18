@@ -158,16 +158,23 @@ Return ONLY the JSON.`;
 export const routeIntent = createServerFn({ method: "POST" })
   .inputValidator((data: { text: string }) => data)
   .handler(async ({ data }) => {
+    // Gemini Flash is ~3-5x faster than Anthropic for tiny JSON routing.
     try {
-      const j = await anthropicCall({
-        max_tokens: 220,
-        system: ROUTER_SYSTEM,
-        messages: [{ role: "user", content: data.text }],
-      });
-      const raw = j.content?.[0]?.text?.replace(/```json|```/g, "").trim() || '{"action":"chat"}';
-      return JSON.parse(raw);
+      const raw = await geminiCall(ROUTER_SYSTEM, [{ role: "user", content: data.text }]);
+      const cleaned = raw.replace(/```json|```/g, "").trim();
+      return JSON.parse(cleaned);
     } catch {
-      return { action: "chat" };
+      try {
+        const j = await anthropicCall({
+          max_tokens: 200,
+          system: ROUTER_SYSTEM,
+          messages: [{ role: "user", content: data.text }],
+        });
+        const raw = j.content?.[0]?.text?.replace(/```json|```/g, "").trim() || '{"action":"chat"}';
+        return JSON.parse(raw);
+      } catch {
+        return { action: "chat" };
+      }
     }
   });
 
