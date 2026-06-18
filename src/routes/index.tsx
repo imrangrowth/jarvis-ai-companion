@@ -188,6 +188,41 @@ async function executeAction(intent: Intent, location: { lat: number; lon: numbe
       if (!intent.number) return { success: false, msg: `I need ${intent.contact}'s number for the message, sir.` };
       window.location.href = `sms:${intent.number}${intent.message ? `?body=${encodeURIComponent(intent.message)}` : ""}`;
       return { success: true, msg: `Drafting SMS to ${intent.contact || intent.number}, sir.` };
+    case "telegram": {
+      const u = intent.contact ? `https://t.me/${encodeURIComponent(intent.contact.replace(/^@/, ""))}` : `https://t.me/`;
+      window.open(u, "_blank");
+      return { success: true, msg: `Opening Telegram${intent.contact ? ` for ${intent.contact}` : ""}, sir.` };
+    }
+    case "messenger": {
+      const u = intent.contact ? `https://m.me/${encodeURIComponent(intent.contact.replace(/^@/, ""))}` : `https://www.messenger.com/`;
+      window.open(u, "_blank");
+      return { success: true, msg: `Opening Messenger${intent.contact ? ` for ${intent.contact}` : ""}, sir.` };
+    }
+    case "instagram": {
+      const q = intent.query?.trim();
+      const u = q
+        ? (q.startsWith("#")
+            ? `https://www.instagram.com/explore/tags/${encodeURIComponent(q.slice(1))}/`
+            : `https://www.instagram.com/${encodeURIComponent(q.replace(/^@/, ""))}/`)
+        : `https://www.instagram.com/`;
+      window.open(u, "_blank");
+      return { success: true, msg: `Opening Instagram${q ? ` — ${q}` : ""}, sir.` };
+    }
+    case "twitter": {
+      const u = intent.message
+        ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(intent.message)}`
+        : intent.query
+          ? `https://twitter.com/search?q=${encodeURIComponent(intent.query)}`
+          : `https://twitter.com/`;
+      window.open(u, "_blank");
+      return { success: true, msg: intent.message ? `Tweet ready for review, sir.` : `Opening X, sir.` };
+    }
+    case "spotify":
+      window.open(`https://open.spotify.com/search/${encodeURIComponent(intent.query || "")}`, "_blank");
+      return { success: true, msg: `Searching Spotify for ${intent.query}, sir.` };
+    case "uber":
+      window.open(`https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=${encodeURIComponent(intent.destination || "")}`, "_blank");
+      return { success: true, msg: `Requesting Uber to ${intent.destination}, sir.` };
     case "navigate":
       window.open(`https://maps.google.com/?q=${encodeURIComponent(intent.destination)}`);
       return { success: true, msg: `Navigation to ${intent.destination} initiated, sir.` };
@@ -197,6 +232,7 @@ async function executeAction(intent: Intent, location: { lat: number; lon: numbe
     case "search":
       window.open(`https://google.com/search?q=${encodeURIComponent(intent.query)}`);
       return { success: true, msg: `Searching for ${intent.query}, sir.` };
+
     case "email":
       window.location.href = `mailto:${intent.to || ""}?subject=${encodeURIComponent(intent.subject || "")}&body=${encodeURIComponent(intent.body || "")}`;
       return { success: true, msg: `Composing email to ${intent.to}, sir.` };
