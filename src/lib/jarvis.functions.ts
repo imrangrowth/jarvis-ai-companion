@@ -158,16 +158,23 @@ Return ONLY the JSON.`;
 export const routeIntent = createServerFn({ method: "POST" })
   .inputValidator((data: { text: string }) => data)
   .handler(async ({ data }) => {
+    // Gemini Flash is ~3-5x faster than Anthropic for tiny JSON routing.
     try {
-      const j = await anthropicCall({
-        max_tokens: 220,
-        system: ROUTER_SYSTEM,
-        messages: [{ role: "user", content: data.text }],
-      });
-      const raw = j.content?.[0]?.text?.replace(/```json|```/g, "").trim() || '{"action":"chat"}';
-      return JSON.parse(raw);
+      const raw = await geminiCall(ROUTER_SYSTEM, [{ role: "user", content: data.text }]);
+      const cleaned = raw.replace(/```json|```/g, "").trim();
+      return JSON.parse(cleaned);
     } catch {
-      return { action: "chat" };
+      try {
+        const j = await anthropicCall({
+          max_tokens: 200,
+          system: ROUTER_SYSTEM,
+          messages: [{ role: "user", content: data.text }],
+        });
+        const raw = j.content?.[0]?.text?.replace(/```json|```/g, "").trim() || '{"action":"chat"}';
+        return JSON.parse(raw);
+      } catch {
+        return { action: "chat" };
+      }
     }
   });
 
@@ -182,15 +189,25 @@ export const chatAgentic = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }) => {
-    const { system, messages, useTools = true, maxTokens = 1000 } = data;
+    const { system, messages, useTools = true, maxTokens = 400 } = data;
+    // Fast path: no tools needed → skip Anthropic loop, hit Gemini Flash directly.
+    if (!useTools) {
+      try {
+        const { reply, source } = await chainedFallback(system, messages);
+        return { reply, searches: [] as string[], source };
+      } catch (e) {
+        console.error("Fast path failed:", e);
+        return { reply: "Apologies, sir. Connection trouble.", searches: [], source: "lovable" as const };
+      }
+    }
     let current: any[] = [...messages];
     let searches: string[] = [];
     try {
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 4; i++) {
         const j = await anthropicCall({
           max_tokens: maxTokens,
           system,
-          tools: useTools ? [{ type: "web_search_20250305", name: "web_search" }] : undefined,
+          tools: [{ type: "web_search_20250305", name: "web_search" }],
           messages: current,
         });
         const texts = (j.content || []).filter((b: any) => b.type === "text");
