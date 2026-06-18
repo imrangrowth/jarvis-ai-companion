@@ -172,6 +172,12 @@ Phone & system actions:
 { "action": "call", "contact": "name", "number": "digits only or null" }
 { "action": "whatsapp", "contact": "name", "number": "digits or null", "message": "text or null" }
 { "action": "sms", "contact": "name", "number": "digits or null", "message": "text or null" }
+{ "action": "telegram", "contact": "username or null", "message": "text or null" }
+{ "action": "messenger", "contact": "username or null" }
+{ "action": "instagram", "query": "username or hashtag or null" }
+{ "action": "twitter", "query": "search or null", "message": "tweet text or null" }
+{ "action": "spotify", "query": "song/artist" }
+{ "action": "uber", "destination": "place name" }
 { "action": "navigate", "destination": "place name" }
 { "action": "youtube", "query": "search terms" }
 { "action": "search", "query": "search terms" }
@@ -180,6 +186,7 @@ Phone & system actions:
 { "action": "timer", "seconds": number, "label": "text" }
 { "action": "weather", "location": "name or null" }
 { "action": "battery" }
+
 
 Long-term memory:
 { "action": "remember", "category": "project|client|task|preference", "title": "short title", "content": "details" }
