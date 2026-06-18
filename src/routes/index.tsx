@@ -359,8 +359,9 @@ function ScanLine() {
 }
 
 function ActionCard({ intent, countdown, onExecute, onCancel }: { intent: any; countdown: number; onExecute: () => void; onCancel: () => void }) {
-  const icons: Record<string, string> = { call: "📞", whatsapp: "💬", sms: "✉️", navigate: "🗺️", youtube: "▶️", search: "🔍", email: "📧", alarm: "⏰", timer: "⏱️", weather: "🌤️", battery: "🔋" };
-  const labels: Record<string, string> = { call: "CALLING", whatsapp: "WHATSAPP", sms: "MESSAGE", navigate: "NAVIGATE", youtube: "YOUTUBE", search: "SEARCH", email: "EMAIL", alarm: "ALARM", timer: "TIMER", weather: "WEATHER", battery: "BATTERY" };
+  const icons: Record<string, string> = { call: "📞", whatsapp: "💬", sms: "✉️", telegram: "✈️", messenger: "💭", instagram: "📸", twitter: "🐦", spotify: "🎵", uber: "🚗", navigate: "🗺️", youtube: "▶️", search: "🔍", email: "📧", alarm: "⏰", timer: "⏱️", weather: "🌤️", battery: "🔋" };
+  const labels: Record<string, string> = { call: "CALLING", whatsapp: "WHATSAPP", sms: "MESSAGE", telegram: "TELEGRAM", messenger: "MESSENGER", instagram: "INSTAGRAM", twitter: "POST TO X", spotify: "SPOTIFY", uber: "UBER", navigate: "NAVIGATE", youtube: "YOUTUBE", search: "SEARCH", email: "EMAIL", alarm: "ALARM", timer: "TIMER", weather: "WEATHER", battery: "BATTERY" };
+
   return (
     <div style={{ width: "100%", padding: "14px 16px", background: "linear-gradient(135deg,rgba(0,25,45,0.98),rgba(0,15,30,0.99))", border: "1px solid #00d4ff55", borderRadius: 6, animation: "slideUp 0.3s cubic-bezier(0.16,1,0.3,1)", position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(to right,transparent,#00d4ff,transparent)", animation: "shimmer 1.5s linear infinite" }} />
