@@ -1,5 +1,45 @@
 import { createServerFn } from "@tanstack/react-start";
 
+// ── Knowledge (always-learning, shared facts) ─────────────────────────────
+export const recallKnowledge = createServerFn({ method: "POST" })
+  .inputValidator((data: { query: string; limit?: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const q = (data.query || "").trim().slice(0, 200);
+      if (!q) return { facts: [] as { topic: string; content: string }[] };
+      // Simple ILIKE fallback works without tsvector tuning; ordered by recency.
+      const { data: rows } = await supabaseAdmin
+        .from("knowledge")
+        .select("topic, content")
+        .or(`topic.ilike.%${q.replace(/[%,]/g, " ")}%,content.ilike.%${q.replace(/[%,]/g, " ")}%`)
+        .order("created_at", { ascending: false })
+        .limit(data.limit ?? 5);
+      return { facts: rows ?? [] };
+    } catch (e) {
+      console.error("recallKnowledge failed:", e);
+      return { facts: [] as { topic: string; content: string }[] };
+    }
+  });
+
+export const logKnowledge = createServerFn({ method: "POST" })
+  .inputValidator((data: { topic: string; content: string; source?: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const topic = (data.topic || "").trim().slice(0, 200);
+      const content = (data.content || "").trim().slice(0, 2000);
+      if (!topic || !content) return { ok: false };
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("knowledge").insert({ topic, content, source: data.source?.slice(0, 200) });
+      return { ok: true };
+    } catch (e) {
+      console.error("logKnowledge failed:", e);
+      return { ok: false };
+    }
+  });
+
+
+
 // ── Types ────────────────────────────────────────────────────────────────
 type TextBlock = { type: "text"; text: string };
 type ImageBlock = {
