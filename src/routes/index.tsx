@@ -852,7 +852,7 @@ function JARVIS() {
     }
 
     // Immediate
-    const immediateActions = ["navigate", "youtube", "search", "email", "alarm", "timer", "weather", "battery"];
+    const immediateActions = ["navigate", "youtube", "search", "email", "alarm", "timer", "weather", "battery", "telegram", "messenger", "instagram", "twitter", "spotify", "uber"];
     if (immediateActions.includes(intent.action)) {
       setState("executing");
       const result = await executeAction(intent, location);
