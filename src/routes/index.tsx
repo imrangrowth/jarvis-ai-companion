@@ -6,8 +6,11 @@ import {
   chatAgentic,
   buildWebsite,
   synthesizeSpeech,
+  recallKnowledge,
+  logKnowledge,
   type ApiMessage,
 } from "@/lib/jarvis.functions";
+
 
 export const Route = createFileRoute("/")({
   component: JARVIS,
@@ -185,6 +188,41 @@ async function executeAction(intent: Intent, location: { lat: number; lon: numbe
       if (!intent.number) return { success: false, msg: `I need ${intent.contact}'s number for the message, sir.` };
       window.location.href = `sms:${intent.number}${intent.message ? `?body=${encodeURIComponent(intent.message)}` : ""}`;
       return { success: true, msg: `Drafting SMS to ${intent.contact || intent.number}, sir.` };
+    case "telegram": {
+      const u = intent.contact ? `https://t.me/${encodeURIComponent(intent.contact.replace(/^@/, ""))}` : `https://t.me/`;
+      window.open(u, "_blank");
+      return { success: true, msg: `Opening Telegram${intent.contact ? ` for ${intent.contact}` : ""}, sir.` };
+    }
+    case "messenger": {
+      const u = intent.contact ? `https://m.me/${encodeURIComponent(intent.contact.replace(/^@/, ""))}` : `https://www.messenger.com/`;
+      window.open(u, "_blank");
+      return { success: true, msg: `Opening Messenger${intent.contact ? ` for ${intent.contact}` : ""}, sir.` };
+    }
+    case "instagram": {
+      const q = intent.query?.trim();
+      const u = q
+        ? (q.startsWith("#")
+            ? `https://www.instagram.com/explore/tags/${encodeURIComponent(q.slice(1))}/`
+            : `https://www.instagram.com/${encodeURIComponent(q.replace(/^@/, ""))}/`)
+        : `https://www.instagram.com/`;
+      window.open(u, "_blank");
+      return { success: true, msg: `Opening Instagram${q ? ` — ${q}` : ""}, sir.` };
+    }
+    case "twitter": {
+      const u = intent.message
+        ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(intent.message)}`
+        : intent.query
+          ? `https://twitter.com/search?q=${encodeURIComponent(intent.query)}`
+          : `https://twitter.com/`;
+      window.open(u, "_blank");
+      return { success: true, msg: intent.message ? `Tweet ready for review, sir.` : `Opening X, sir.` };
+    }
+    case "spotify":
+      window.open(`https://open.spotify.com/search/${encodeURIComponent(intent.query || "")}`, "_blank");
+      return { success: true, msg: `Searching Spotify for ${intent.query}, sir.` };
+    case "uber":
+      window.open(`https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=${encodeURIComponent(intent.destination || "")}`, "_blank");
+      return { success: true, msg: `Requesting Uber to ${intent.destination}, sir.` };
     case "navigate":
       window.open(`https://maps.google.com/?q=${encodeURIComponent(intent.destination)}`);
       return { success: true, msg: `Navigation to ${intent.destination} initiated, sir.` };
@@ -194,6 +232,7 @@ async function executeAction(intent: Intent, location: { lat: number; lon: numbe
     case "search":
       window.open(`https://google.com/search?q=${encodeURIComponent(intent.query)}`);
       return { success: true, msg: `Searching for ${intent.query}, sir.` };
+
     case "email":
       window.location.href = `mailto:${intent.to || ""}?subject=${encodeURIComponent(intent.subject || "")}&body=${encodeURIComponent(intent.body || "")}`;
       return { success: true, msg: `Composing email to ${intent.to}, sir.` };
@@ -320,8 +359,9 @@ function ScanLine() {
 }
 
 function ActionCard({ intent, countdown, onExecute, onCancel }: { intent: any; countdown: number; onExecute: () => void; onCancel: () => void }) {
-  const icons: Record<string, string> = { call: "📞", whatsapp: "💬", sms: "✉️", navigate: "🗺️", youtube: "▶️", search: "🔍", email: "📧", alarm: "⏰", timer: "⏱️", weather: "🌤️", battery: "🔋" };
-  const labels: Record<string, string> = { call: "CALLING", whatsapp: "WHATSAPP", sms: "MESSAGE", navigate: "NAVIGATE", youtube: "YOUTUBE", search: "SEARCH", email: "EMAIL", alarm: "ALARM", timer: "TIMER", weather: "WEATHER", battery: "BATTERY" };
+  const icons: Record<string, string> = { call: "📞", whatsapp: "💬", sms: "✉️", telegram: "✈️", messenger: "💭", instagram: "📸", twitter: "🐦", spotify: "🎵", uber: "🚗", navigate: "🗺️", youtube: "▶️", search: "🔍", email: "📧", alarm: "⏰", timer: "⏱️", weather: "🌤️", battery: "🔋" };
+  const labels: Record<string, string> = { call: "CALLING", whatsapp: "WHATSAPP", sms: "MESSAGE", telegram: "TELEGRAM", messenger: "MESSENGER", instagram: "INSTAGRAM", twitter: "POST TO X", spotify: "SPOTIFY", uber: "UBER", navigate: "NAVIGATE", youtube: "YOUTUBE", search: "SEARCH", email: "EMAIL", alarm: "ALARM", timer: "TIMER", weather: "WEATHER", battery: "BATTERY" };
+
   return (
     <div style={{ width: "100%", padding: "14px 16px", background: "linear-gradient(135deg,rgba(0,25,45,0.98),rgba(0,15,30,0.99))", border: "1px solid #00d4ff55", borderRadius: 6, animation: "slideUp 0.3s cubic-bezier(0.16,1,0.3,1)", position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(to right,transparent,#00d4ff,transparent)", animation: "shimmer 1.5s linear infinite" }} />
@@ -558,6 +598,9 @@ function JARVIS() {
   const chatAgenticFn = useServerFn(chatAgentic);
   const buildWebsiteFn = useServerFn(buildWebsite);
   const synthesizeSpeechFn = useServerFn(synthesizeSpeech);
+  const recallKnowledgeFn = useServerFn(recallKnowledge);
+  const logKnowledgeFn = useServerFn(logKnowledge);
+
 
   const color = STATE_COLORS[state] || "#00d4ff";
 
@@ -622,17 +665,42 @@ function JARVIS() {
     setState("thinking");
     try {
       const memCtx = buildMemoryContext(memoryRef.current);
-      const sys = `${JARVIS_SYSTEM}\n\n${memCtx}`;
       const lastUser = baseMsgs[baseMsgs.length - 1];
+      const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
+
+      // Always-learning: pull relevant prior facts from the knowledge base
+      let learned = "";
+      try {
+        const { facts } = await recallKnowledgeFn({ data: { query: userText, limit: 4 } });
+        if (facts?.length) {
+          learned = "LEARNED KNOWLEDGE (use silently, do not cite unless asked):\n" +
+            facts.map((f: any) => `• ${f.topic}: ${f.content}`).join("\n");
+        }
+      } catch { /* non-fatal */ }
+
+      const sys = [JARVIS_SYSTEM, memCtx, learned].filter(Boolean).join("\n\n");
       const augmented = contextTag && lastUser
         ? [...baseMsgs.slice(0, -1), { ...lastUser, content: lastUser.content + "\n" + contextTag }]
         : baseMsgs;
       const apiMsgs: ApiMessage[] = augmented.map((m) => ({ role: m.role, content: m.content }));
       const { reply, searches } = await chatAgenticFn({ data: { system: sys, messages: apiMsgs, useTools: true } });
       setMessages((prev) => [...prev, { role: "assistant", content: reply, agent: "jarvis", searches }]);
+
+      // Log learnings from any web search → persistent memory across sessions
+      if (searches && searches.length > 0 && reply && userText) {
+        logKnowledgeFn({
+          data: {
+            topic: (searches[0] || userText).slice(0, 200),
+            content: reply.slice(0, 2000),
+            source: searches.join(" | ").slice(0, 200),
+          },
+        }).catch(() => { /* non-fatal */ });
+      }
+
       finishWithVoice(reply);
     } catch { handleApiError(); }
-  }, [finishWithVoice, handleApiError, chatAgenticFn]);
+  }, [finishWithVoice, handleApiError, chatAgenticFn, recallKnowledgeFn, logKnowledgeFn]);
+
 
   // Execute pending action
   const runPendingAction = useCallback(async () => {
@@ -812,7 +880,7 @@ function JARVIS() {
     }
 
     // Immediate
-    const immediateActions = ["navigate", "youtube", "search", "email", "alarm", "timer", "weather", "battery"];
+    const immediateActions = ["navigate", "youtube", "search", "email", "alarm", "timer", "weather", "battery", "telegram", "messenger", "instagram", "twitter", "spotify", "uber"];
     if (immediateActions.includes(intent.action)) {
       setState("executing");
       const result = await executeAction(intent, location);
