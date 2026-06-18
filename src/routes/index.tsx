@@ -665,17 +665,42 @@ function JARVIS() {
     setState("thinking");
     try {
       const memCtx = buildMemoryContext(memoryRef.current);
-      const sys = `${JARVIS_SYSTEM}\n\n${memCtx}`;
       const lastUser = baseMsgs[baseMsgs.length - 1];
+      const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
+
+      // Always-learning: pull relevant prior facts from the knowledge base
+      let learned = "";
+      try {
+        const { facts } = await recallKnowledgeFn({ data: { query: userText, limit: 4 } });
+        if (facts?.length) {
+          learned = "LEARNED KNOWLEDGE (use silently, do not cite unless asked):\n" +
+            facts.map((f: any) => `• ${f.topic}: ${f.content}`).join("\n");
+        }
+      } catch { /* non-fatal */ }
+
+      const sys = [JARVIS_SYSTEM, memCtx, learned].filter(Boolean).join("\n\n");
       const augmented = contextTag && lastUser
         ? [...baseMsgs.slice(0, -1), { ...lastUser, content: lastUser.content + "\n" + contextTag }]
         : baseMsgs;
       const apiMsgs: ApiMessage[] = augmented.map((m) => ({ role: m.role, content: m.content }));
       const { reply, searches } = await chatAgenticFn({ data: { system: sys, messages: apiMsgs, useTools: true } });
       setMessages((prev) => [...prev, { role: "assistant", content: reply, agent: "jarvis", searches }]);
+
+      // Log learnings from any web search → persistent memory across sessions
+      if (searches && searches.length > 0 && reply && userText) {
+        logKnowledgeFn({
+          data: {
+            topic: (searches[0] || userText).slice(0, 200),
+            content: reply.slice(0, 2000),
+            source: searches.join(" | ").slice(0, 200),
+          },
+        }).catch(() => { /* non-fatal */ });
+      }
+
       finishWithVoice(reply);
     } catch { handleApiError(); }
-  }, [finishWithVoice, handleApiError, chatAgenticFn]);
+  }, [finishWithVoice, handleApiError, chatAgenticFn, recallKnowledgeFn, logKnowledgeFn]);
+
 
   // Execute pending action
   const runPendingAction = useCallback(async () => {
