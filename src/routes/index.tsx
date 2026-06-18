@@ -6,8 +6,11 @@ import {
   chatAgentic,
   buildWebsite,
   synthesizeSpeech,
+  recallKnowledge,
+  logKnowledge,
   type ApiMessage,
 } from "@/lib/jarvis.functions";
+
 
 export const Route = createFileRoute("/")({
   component: JARVIS,
