@@ -189,15 +189,25 @@ export const chatAgentic = createServerFn({ method: "POST" })
     }) => data,
   )
   .handler(async ({ data }) => {
-    const { system, messages, useTools = true, maxTokens = 1000 } = data;
+    const { system, messages, useTools = true, maxTokens = 400 } = data;
+    // Fast path: no tools needed → skip Anthropic loop, hit Gemini Flash directly.
+    if (!useTools) {
+      try {
+        const { reply, source } = await chainedFallback(system, messages);
+        return { reply, searches: [] as string[], source };
+      } catch (e) {
+        console.error("Fast path failed:", e);
+        return { reply: "Apologies, sir. Connection trouble.", searches: [], source: "lovable" as const };
+      }
+    }
     let current: any[] = [...messages];
     let searches: string[] = [];
     try {
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 4; i++) {
         const j = await anthropicCall({
           max_tokens: maxTokens,
           system,
-          tools: useTools ? [{ type: "web_search_20250305", name: "web_search" }] : undefined,
+          tools: [{ type: "web_search_20250305", name: "web_search" }],
           messages: current,
         });
         const texts = (j.content || []).filter((b: any) => b.type === "text");
