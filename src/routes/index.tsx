@@ -598,6 +598,9 @@ function JARVIS() {
   const chatAgenticFn = useServerFn(chatAgentic);
   const buildWebsiteFn = useServerFn(buildWebsite);
   const synthesizeSpeechFn = useServerFn(synthesizeSpeech);
+  const recallKnowledgeFn = useServerFn(recallKnowledge);
+  const logKnowledgeFn = useServerFn(logKnowledge);
+
 
   const color = STATE_COLORS[state] || "#00d4ff";
 
