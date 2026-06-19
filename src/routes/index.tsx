@@ -75,7 +75,7 @@ Response rules — speed and brevity:
 
 // Live system prompt — rebuilds each call so date/time/identity stay fresh.
 function jarvisSystem(): string {
-  return `${buildLiveContext()}\n\n${buildIdentityBlock()}\n\n${JARVIS_SYSTEM}`;
+  return `${buildLiveContext()}\n\n${buildIdentityBlock()}\n\n${jarvisSystem()}`;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -684,7 +684,7 @@ function JARVIS() {
         }
       } catch { /* non-fatal */ }
 
-      const sys = [JARVIS_SYSTEM, memCtx, learned].filter(Boolean).join("\n\n");
+      const sys = [jarvisSystem(), memCtx, learned].filter(Boolean).join("\n\n");
       const augmented = contextTag && lastUser
         ? [...baseMsgs.slice(0, -1), { ...lastUser, content: lastUser.content + "\n" + contextTag }]
         : baseMsgs;
@@ -781,7 +781,7 @@ function JARVIS() {
             { type: "text", text: userText || "Analyze this image, sir." },
           ],
         }];
-        const { reply } = await chatAgenticFn({ data: { system: `${JARVIS_SYSTEM}\n\n${memCtx}`, messages: apiMsgs, useTools: false, maxTokens: 1200 } });
+        const { reply } = await chatAgenticFn({ data: { system: `${jarvisSystem()}\n\n${memCtx}`, messages: apiMsgs, useTools: false, maxTokens: 1200 } });
         setMessages((prev) => [...prev, { role: "assistant", content: reply, agent: "jarvis" }]);
         finishWithVoice(reply);
       } catch { handleApiError(); }
@@ -809,7 +809,7 @@ function JARVIS() {
       setWorkspace({ task: intent.task || userText, agent: intent.agent, textProgress: "" });
       try {
         const memCtx = buildMemoryContext(memoryRef.current);
-        const sys = `${JARVIS_SYSTEM}\n\n${AGENTS[intent.agent].prompt}\n\n${memCtx}`;
+        const sys = `${jarvisSystem()}\n\n${AGENTS[intent.agent].prompt}\n\n${memCtx}`;
         const apiMsgs: ApiMessage[] = newMsgs.map((m) => ({ role: m.role, content: m.content }));
         setState("thinking");
 
