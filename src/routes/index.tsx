@@ -10,6 +10,7 @@ import {
   logKnowledge,
   type ApiMessage,
 } from "@/lib/jarvis.functions";
+import { buildIdentityBlock, buildLiveContext } from "@/lib/jarvis-self-model";
 
 
 export const Route = createFileRoute("/")({
