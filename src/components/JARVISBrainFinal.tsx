@@ -156,8 +156,8 @@ export default function JARVISBrainFinal({ userId = "imran-001", voice = false }
 
       if (voice) {
         try {
-          const { audio, mimeType } = await tts({ data: { text: reply.slice(0, 1200) } });
-          const a = new Audio(`data:${mimeType};base64,${audio}`);
+          const { audioBase64, mimeType } = await tts({ data: { text: reply.slice(0, 1200) } });
+          const a = new Audio(`data:${mimeType};base64,${audioBase64}`);
           a.play().catch(() => {});
         } catch (e) { console.error("voice", e); }
       }
