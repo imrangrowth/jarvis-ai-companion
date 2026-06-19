@@ -73,6 +73,11 @@ Response rules — speed and brevity:
 - When [ACTION_EXECUTED: X] is given, just confirm crisply: "Done." / "Opened maps." / "Message ready."
 - When [ACTION_NEEDED: X], state what's missing in under 10 words.`;
 
+// Live system prompt — rebuilds each call so date/time/identity stay fresh.
+function jarvisSystem(): string {
+  return `${buildLiveContext()}\n\n${buildIdentityBlock()}\n\n${JARVIS_SYSTEM}`;
+}
+
 // ══════════════════════════════════════════════════════════
 //  MEMORY (localStorage)
 // ══════════════════════════════════════════════════════════
