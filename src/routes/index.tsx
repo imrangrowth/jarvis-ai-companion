@@ -75,7 +75,7 @@ Response rules — speed and brevity:
 
 // Live system prompt — rebuilds each call so date/time/identity stay fresh.
 function jarvisSystem(): string {
-  return `${buildLiveContext()}\n\n${buildIdentityBlock()}\n\n${jarvisSystem()}`;
+  return `${buildLiveContext()}\n\n${buildIdentityBlock()}\n\n${JARVIS_SYSTEM}`;
 }
 
 // ══════════════════════════════════════════════════════════
