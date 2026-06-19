@@ -14,6 +14,222 @@ export type Database = {
   }
   public: {
     Tables: {
+      jarvis_actions: {
+        Row: {
+          action_type: string
+          id: string
+          payload: Json | null
+          result: string | null
+          target: string | null
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          id?: string
+          payload?: Json | null
+          result?: string | null
+          target?: string | null
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          id?: string
+          payload?: Json | null
+          result?: string | null
+          target?: string | null
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      jarvis_conversations: {
+        Row: {
+          id: string
+          jarvis_response: string | null
+          metadata: Json | null
+          timestamp: string
+          user_id: string
+          user_input: string
+        }
+        Insert: {
+          id?: string
+          jarvis_response?: string | null
+          metadata?: Json | null
+          timestamp?: string
+          user_id: string
+          user_input: string
+        }
+        Update: {
+          id?: string
+          jarvis_response?: string | null
+          metadata?: Json | null
+          timestamp?: string
+          user_id?: string
+          user_input?: string
+        }
+        Relationships: []
+      }
+      jarvis_decision_history: {
+        Row: {
+          agent_selected: string | null
+          classification: string | null
+          decision_data: Json | null
+          id: string
+          timestamp: string
+          user_id: string
+          user_input: string
+        }
+        Insert: {
+          agent_selected?: string | null
+          classification?: string | null
+          decision_data?: Json | null
+          id?: string
+          timestamp?: string
+          user_id: string
+          user_input: string
+        }
+        Update: {
+          agent_selected?: string | null
+          classification?: string | null
+          decision_data?: Json | null
+          id?: string
+          timestamp?: string
+          user_id?: string
+          user_input?: string
+        }
+        Relationships: []
+      }
+      jarvis_goals: {
+        Row: {
+          created_at: string
+          goal_name: string
+          id: string
+          priority: number | null
+          progress: number | null
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          goal_name: string
+          id?: string
+          priority?: number | null
+          progress?: number | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          goal_name?: string
+          id?: string
+          priority?: number | null
+          progress?: number | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      jarvis_knowledge: {
+        Row: {
+          category: string | null
+          content: string
+          id: string
+          learned_from_query: boolean | null
+          source: string | null
+          timestamp: string
+          topic: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          content: string
+          id?: string
+          learned_from_query?: boolean | null
+          source?: string | null
+          timestamp?: string
+          topic: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          content?: string
+          id?: string
+          learned_from_query?: boolean | null
+          source?: string | null
+          timestamp?: string
+          topic?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      jarvis_mistakes: {
+        Row: {
+          context: string | null
+          correction: string | null
+          id: string
+          learned: boolean | null
+          lesson_learned: string | null
+          mistake_description: string
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          context?: string | null
+          correction?: string | null
+          id?: string
+          learned?: boolean | null
+          lesson_learned?: string | null
+          mistake_description: string
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          context?: string | null
+          correction?: string | null
+          id?: string
+          learned?: boolean | null
+          lesson_learned?: string | null
+          mistake_description?: string
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      jarvis_patterns: {
+        Row: {
+          action_taken: string | null
+          confidence: number | null
+          discovered_at: string
+          frequency: number | null
+          id: string
+          pattern_name: string
+          user_id: string
+        }
+        Insert: {
+          action_taken?: string | null
+          confidence?: number | null
+          discovered_at?: string
+          frequency?: number | null
+          id?: string
+          pattern_name: string
+          user_id: string
+        }
+        Update: {
+          action_taken?: string | null
+          confidence?: number | null
+          discovered_at?: string
+          frequency?: number | null
+          id?: string
+          pattern_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       knowledge: {
         Row: {
           content: string
