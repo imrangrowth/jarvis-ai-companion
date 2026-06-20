@@ -103,33 +103,69 @@ export type Database = {
       }
       jarvis_goals: {
         Row: {
+          continuous_goals: Json | null
           created_at: string
-          goal_name: string
+          goal_name: string | null
           id: string
+          last_updated: string | null
+          primary_goal: string | null
           priority: number | null
           progress: number | null
+          secondary_goals: Json | null
           status: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          continuous_goals?: Json | null
           created_at?: string
-          goal_name: string
+          goal_name?: string | null
           id?: string
+          last_updated?: string | null
+          primary_goal?: string | null
           priority?: number | null
           progress?: number | null
+          secondary_goals?: Json | null
           status?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          continuous_goals?: Json | null
           created_at?: string
-          goal_name?: string
+          goal_name?: string | null
           id?: string
+          last_updated?: string | null
+          primary_goal?: string | null
           priority?: number | null
           progress?: number | null
+          secondary_goals?: Json | null
           status?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      jarvis_identity: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          last_updated: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: string
+          last_updated?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          last_updated?: string
           user_id?: string
         }
         Relationships: []
@@ -137,8 +173,12 @@ export type Database = {
       jarvis_knowledge: {
         Row: {
           category: string | null
+          confidence: number | null
           content: string
+          domain: string | null
           id: string
+          knowledge_id: string | null
+          last_accessed: string | null
           learned_from_query: boolean | null
           source: string | null
           timestamp: string
@@ -147,8 +187,12 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          confidence?: number | null
           content: string
+          domain?: string | null
           id?: string
+          knowledge_id?: string | null
+          last_accessed?: string | null
           learned_from_query?: boolean | null
           source?: string | null
           timestamp?: string
@@ -157,8 +201,12 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          confidence?: number | null
           content?: string
+          domain?: string | null
           id?: string
+          knowledge_id?: string | null
+          last_accessed?: string | null
           learned_from_query?: boolean | null
           source?: string | null
           timestamp?: string
@@ -226,6 +274,42 @@ export type Database = {
           frequency?: number | null
           id?: string
           pattern_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      jarvis_relationships: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          interaction_history: Json
+          last_updated: string
+          name: string
+          relationship_id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: string
+          interaction_history?: Json
+          last_updated?: string
+          name: string
+          relationship_id: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          interaction_history?: Json
+          last_updated?: string
+          name?: string
+          relationship_id?: string
+          type?: string
           user_id?: string
         }
         Relationships: []

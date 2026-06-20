@@ -11,6 +11,12 @@ import {
   type ApiMessage,
 } from "@/lib/jarvis.functions";
 import { buildIdentityBlock, buildLiveContext } from "@/lib/jarvis-self-model";
+import {
+  uploadPillars,
+  retrievePillars,
+  saveInteraction,
+  buildPillarContext,
+} from "@/lib/jarvis-pillars.functions";
 
 
 export const Route = createFileRoute("/")({
@@ -606,6 +612,12 @@ function JARVIS() {
   const synthesizeSpeechFn = useServerFn(synthesizeSpeech);
   const recallKnowledgeFn = useServerFn(recallKnowledge);
   const logKnowledgeFn = useServerFn(logKnowledge);
+  const uploadPillarsFn = useServerFn(uploadPillars);
+  const retrievePillarsFn = useServerFn(retrievePillars);
+  const saveInteractionFn = useServerFn(saveInteraction);
+  const pillarsRef = useRef<any>({ identity: null, goals: null, relationships: [], knowledge: [] });
+  const [pillarStats, setPillarStats] = useState<any>(null);
+  const [uploadMsg, setUploadMsg] = useState<string>("");
 
 
   const color = STATE_COLORS[state] || "#00d4ff";
@@ -613,6 +625,15 @@ function JARVIS() {
   useEffect(() => { setTime(new Date()); const t = setInterval(() => setTime(new Date()), 1000); return () => clearInterval(t); }, []);
   useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [messages]);
   useEffect(() => { setMemory(loadMemory()); }, []);
+
+  // Startup pillar load
+  useEffect(() => {
+    retrievePillarsFn({ data: {} }).then((p: any) => {
+      pillarsRef.current = p;
+      setPillarStats(p.stats);
+      console.log("[JARVIS] Pillars loaded:", p.stats);
+    }).catch((e) => console.error("[JARVIS] Pillar load failed:", e));
+  }, [retrievePillarsFn]);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return;
@@ -648,6 +669,46 @@ function JARVIS() {
     });
   }, []);
 
+  // Upload one or more pillar JSON files (identity/goals/relationships/knowledge)
+  const handlePillarFiles = useCallback(async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    setUploadMsg("Parsing files…");
+    const payload: any = {};
+    for (const file of Array.from(files)) {
+      try {
+        const text = await file.text();
+        const json = JSON.parse(text);
+        const name = file.name.toLowerCase();
+        if (name.includes("identity") || json.identity) payload.identity = json.identity ?? json;
+        else if (name.includes("goal") || json.goals) payload.goals = json.goals ?? json;
+        else if (name.includes("relationship") || json.relationships) payload.relationships = json.relationships ?? json;
+        else if (name.includes("knowledge") || json.knowledge) payload.knowledge = json.knowledge ?? json;
+        else {
+          // Heuristic: array → knowledge, object with people-like keys → relationships
+          if (Array.isArray(json)) payload.knowledge = json;
+          else payload.identity = json;
+        }
+      } catch (e: any) {
+        console.error("Bad JSON in", file.name, e);
+        setUploadMsg(`✗ ${file.name}: invalid JSON`);
+        return;
+      }
+    }
+    try {
+      const res = await uploadPillarsFn({ data: payload });
+      const msg = Object.entries(res.report)
+        .map(([k, v]: [string, any]) => `${k}: ${v.ok ? "✓" : "✗ " + v.error}`)
+        .join(" · ");
+      setUploadMsg(msg || "Done.");
+      // Refresh
+      const fresh = await retrievePillarsFn({ data: {} });
+      pillarsRef.current = fresh;
+      setPillarStats(fresh.stats);
+    } catch (e: any) {
+      setUploadMsg("Upload failed: " + (e?.message ?? "unknown"));
+    }
+  }, [uploadPillarsFn, retrievePillarsFn]);
+
   // Voice output: user key > server secret > browser TTS
   const finishWithVoice = useCallback((text: string) => {
     if (voiceOn) {
@@ -674,7 +735,19 @@ function JARVIS() {
       const lastUser = baseMsgs[baseMsgs.length - 1];
       const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
 
-      // Always-learning: pull relevant prior facts from the knowledge base
+      // PILLAR MEMORY — refresh and inject identity, goals, relationships, knowledge
+      let pillarCtx = "";
+      try {
+        const fresh = await retrievePillarsFn({ data: { query: userText } });
+        pillarsRef.current = fresh;
+        setPillarStats(fresh.stats);
+        pillarCtx = buildPillarContext(fresh);
+      } catch (e) {
+        console.error("[respondAsJarvisCore] pillar refresh failed:", e);
+        pillarCtx = buildPillarContext(pillarsRef.current);
+      }
+
+      // Legacy always-learning facts (shared 'knowledge' table)
       let learned = "";
       try {
         const { facts } = await recallKnowledgeFn({ data: { query: userText, limit: 4 } });
@@ -684,7 +757,7 @@ function JARVIS() {
         }
       } catch { /* non-fatal */ }
 
-      const sys = [jarvisSystem(), memCtx, learned].filter(Boolean).join("\n\n");
+      const sys = [jarvisSystem(), pillarCtx, memCtx, learned].filter(Boolean).join("\n\n");
       const augmented = contextTag && lastUser
         ? [...baseMsgs.slice(0, -1), { ...lastUser, content: lastUser.content + "\n" + contextTag }]
         : baseMsgs;
@@ -692,7 +765,12 @@ function JARVIS() {
       const { reply, searches } = await chatAgenticFn({ data: { system: sys, messages: apiMsgs, useTools: true } });
       setMessages((prev) => [...prev, { role: "assistant", content: reply, agent: "jarvis", searches }]);
 
-      // Log learnings from any web search → persistent memory across sessions
+      // Persist interaction + extract knowledge (fire-and-forget)
+      saveInteractionFn({
+        data: { userInput: userText, jarvisResponse: reply, agent: "jarvis" },
+      }).catch(() => { /* non-fatal */ });
+
+      // Log learnings from any web search → shared 'knowledge' table
       if (searches && searches.length > 0 && reply && userText) {
         logKnowledgeFn({
           data: {
@@ -705,7 +783,7 @@ function JARVIS() {
 
       finishWithVoice(reply);
     } catch { handleApiError(); }
-  }, [finishWithVoice, handleApiError, chatAgenticFn, recallKnowledgeFn, logKnowledgeFn]);
+  }, [finishWithVoice, handleApiError, chatAgenticFn, recallKnowledgeFn, logKnowledgeFn, retrievePillarsFn, saveInteractionFn]);
 
 
   // Execute pending action
@@ -1117,7 +1195,36 @@ function JARVIS() {
           </div>
         )}
 
-        {showMemory && <MemoryPanel memory={memory} onAdd={addMemoryEntry} onDelete={deleteMemoryEntry} />}
+        {showMemory && (
+          <>
+            <div className="card" style={{ width: "100%", maxWidth: 480, padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+              <Corner pos="tl" /><Corner pos="br" />
+              <div style={{ fontSize: 8, color: "#22d3ee", letterSpacing: 2 }}>🧬 PILLAR MEMORY (PERSISTENT)</div>
+              <div style={{ fontSize: 10, color: "#81d4fa", lineHeight: 1.5 }}>
+                {pillarStats ? (
+                  pillarStats.error
+                    ? <span style={{ color: "#ff6677" }}>✗ {pillarStats.error}</span>
+                    : <>Identity: {pillarStats.identityLoaded ? "✓" : "—"} · Goals: {pillarStats.goalsCount} · Relationships: {pillarStats.relationshipsCount} · Knowledge: {pillarStats.knowledgeCount}</>
+                ) : "Loading pillars…"}
+              </div>
+              <label className="btn" style={{ textAlign: "center", cursor: "pointer" }}>
+                📂 UPLOAD PILLAR JSON FILES
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={(e) => { handlePillarFiles(e.target.files); e.target.value = ""; }}
+                />
+              </label>
+              <div style={{ fontSize: 8, color: "#0a5070", letterSpacing: 1, lineHeight: 1.6 }}>
+                Drop identity.json, goals.json, relationships.json, knowledge.json (any subset). Detected by filename or top-level key.
+              </div>
+              {uploadMsg && <div style={{ fontSize: 10, color: "#86efac" }}>{uploadMsg}</div>}
+            </div>
+            <MemoryPanel memory={memory} onAdd={addMemoryEntry} onDelete={deleteMemoryEntry} />
+          </>
+        )}
 
         {showChat && (
           <div className="card" style={{ width: "100%", maxWidth: 480, padding: 14 }}>
