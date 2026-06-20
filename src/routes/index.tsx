@@ -11,6 +11,12 @@ import {
   type ApiMessage,
 } from "@/lib/jarvis.functions";
 import { buildIdentityBlock, buildLiveContext } from "@/lib/jarvis-self-model";
+import {
+  uploadPillars,
+  retrievePillars,
+  saveInteraction,
+  buildPillarContext,
+} from "@/lib/jarvis-pillars.functions";
 
 
 export const Route = createFileRoute("/")({
