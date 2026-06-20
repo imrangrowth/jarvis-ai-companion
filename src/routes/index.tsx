@@ -1195,7 +1195,36 @@ function JARVIS() {
           </div>
         )}
 
-        {showMemory && <MemoryPanel memory={memory} onAdd={addMemoryEntry} onDelete={deleteMemoryEntry} />}
+        {showMemory && (
+          <>
+            <div className="card" style={{ width: "100%", maxWidth: 480, padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+              <Corner pos="tl" /><Corner pos="br" />
+              <div style={{ fontSize: 8, color: "#22d3ee", letterSpacing: 2 }}>🧬 PILLAR MEMORY (PERSISTENT)</div>
+              <div style={{ fontSize: 10, color: "#81d4fa", lineHeight: 1.5 }}>
+                {pillarStats ? (
+                  pillarStats.error
+                    ? <span style={{ color: "#ff6677" }}>✗ {pillarStats.error}</span>
+                    : <>Identity: {pillarStats.identityLoaded ? "✓" : "—"} · Goals: {pillarStats.goalsCount} · Relationships: {pillarStats.relationshipsCount} · Knowledge: {pillarStats.knowledgeCount}</>
+                ) : "Loading pillars…"}
+              </div>
+              <label className="btn" style={{ textAlign: "center", cursor: "pointer" }}>
+                📂 UPLOAD PILLAR JSON FILES
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={(e) => { handlePillarFiles(e.target.files); e.target.value = ""; }}
+                />
+              </label>
+              <div style={{ fontSize: 8, color: "#0a5070", letterSpacing: 1, lineHeight: 1.6 }}>
+                Drop identity.json, goals.json, relationships.json, knowledge.json (any subset). Detected by filename or top-level key.
+              </div>
+              {uploadMsg && <div style={{ fontSize: 10, color: "#86efac" }}>{uploadMsg}</div>}
+            </div>
+            <MemoryPanel memory={memory} onAdd={addMemoryEntry} onDelete={deleteMemoryEntry} />
+          </>
+        )}
 
         {showChat && (
           <div className="card" style={{ width: "100%", maxWidth: 480, padding: 14 }}>
