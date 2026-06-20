@@ -695,7 +695,19 @@ function JARVIS() {
       const lastUser = baseMsgs[baseMsgs.length - 1];
       const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
 
-      // Always-learning: pull relevant prior facts from the knowledge base
+      // PILLAR MEMORY — refresh and inject identity, goals, relationships, knowledge
+      let pillarCtx = "";
+      try {
+        const fresh = await retrievePillarsFn({ data: { query: userText } });
+        pillarsRef.current = fresh;
+        setPillarStats(fresh.stats);
+        pillarCtx = buildPillarContext(fresh);
+      } catch (e) {
+        console.error("[respondAsJarvisCore] pillar refresh failed:", e);
+        pillarCtx = buildPillarContext(pillarsRef.current);
+      }
+
+      // Legacy always-learning facts (shared 'knowledge' table)
       let learned = "";
       try {
         const { facts } = await recallKnowledgeFn({ data: { query: userText, limit: 4 } });
@@ -705,7 +717,7 @@ function JARVIS() {
         }
       } catch { /* non-fatal */ }
 
-      const sys = [jarvisSystem(), memCtx, learned].filter(Boolean).join("\n\n");
+      const sys = [jarvisSystem(), pillarCtx, memCtx, learned].filter(Boolean).join("\n\n");
       const augmented = contextTag && lastUser
         ? [...baseMsgs.slice(0, -1), { ...lastUser, content: lastUser.content + "\n" + contextTag }]
         : baseMsgs;
@@ -713,7 +725,12 @@ function JARVIS() {
       const { reply, searches } = await chatAgenticFn({ data: { system: sys, messages: apiMsgs, useTools: true } });
       setMessages((prev) => [...prev, { role: "assistant", content: reply, agent: "jarvis", searches }]);
 
-      // Log learnings from any web search → persistent memory across sessions
+      // Persist interaction + extract knowledge (fire-and-forget)
+      saveInteractionFn({
+        data: { userInput: userText, jarvisResponse: reply, agent: "jarvis" },
+      }).catch(() => { /* non-fatal */ });
+
+      // Log learnings from any web search → shared 'knowledge' table
       if (searches && searches.length > 0 && reply && userText) {
         logKnowledgeFn({
           data: {
@@ -726,7 +743,7 @@ function JARVIS() {
 
       finishWithVoice(reply);
     } catch { handleApiError(); }
-  }, [finishWithVoice, handleApiError, chatAgenticFn, recallKnowledgeFn, logKnowledgeFn]);
+  }, [finishWithVoice, handleApiError, chatAgenticFn, recallKnowledgeFn, logKnowledgeFn, retrievePillarsFn, saveInteractionFn]);
 
 
   // Execute pending action
