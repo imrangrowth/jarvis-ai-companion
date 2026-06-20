@@ -626,6 +626,15 @@ function JARVIS() {
   useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [messages]);
   useEffect(() => { setMemory(loadMemory()); }, []);
 
+  // Startup pillar load
+  useEffect(() => {
+    retrievePillarsFn({ data: {} }).then((p: any) => {
+      pillarsRef.current = p;
+      setPillarStats(p.stats);
+      console.log("[JARVIS] Pillars loaded:", p.stats);
+    }).catch((e) => console.error("[JARVIS] Pillar load failed:", e));
+  }, [retrievePillarsFn]);
+
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(async (pos) => {
