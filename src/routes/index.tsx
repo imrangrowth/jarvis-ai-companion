@@ -669,6 +669,46 @@ function JARVIS() {
     });
   }, []);
 
+  // Upload one or more pillar JSON files (identity/goals/relationships/knowledge)
+  const handlePillarFiles = useCallback(async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    setUploadMsg("Parsing files…");
+    const payload: any = {};
+    for (const file of Array.from(files)) {
+      try {
+        const text = await file.text();
+        const json = JSON.parse(text);
+        const name = file.name.toLowerCase();
+        if (name.includes("identity") || json.identity) payload.identity = json.identity ?? json;
+        else if (name.includes("goal") || json.goals) payload.goals = json.goals ?? json;
+        else if (name.includes("relationship") || json.relationships) payload.relationships = json.relationships ?? json;
+        else if (name.includes("knowledge") || json.knowledge) payload.knowledge = json.knowledge ?? json;
+        else {
+          // Heuristic: array → knowledge, object with people-like keys → relationships
+          if (Array.isArray(json)) payload.knowledge = json;
+          else payload.identity = json;
+        }
+      } catch (e: any) {
+        console.error("Bad JSON in", file.name, e);
+        setUploadMsg(`✗ ${file.name}: invalid JSON`);
+        return;
+      }
+    }
+    try {
+      const res = await uploadPillarsFn({ data: payload });
+      const msg = Object.entries(res.report)
+        .map(([k, v]: [string, any]) => `${k}: ${v.ok ? "✓" : "✗ " + v.error}`)
+        .join(" · ");
+      setUploadMsg(msg || "Done.");
+      // Refresh
+      const fresh = await retrievePillarsFn({ data: {} });
+      pillarsRef.current = fresh;
+      setPillarStats(fresh.stats);
+    } catch (e: any) {
+      setUploadMsg("Upload failed: " + (e?.message ?? "unknown"));
+    }
+  }, [uploadPillarsFn, retrievePillarsFn]);
+
   // Voice output: user key > server secret > browser TTS
   const finishWithVoice = useCallback((text: string) => {
     if (voiceOn) {
