@@ -612,6 +612,12 @@ function JARVIS() {
   const synthesizeSpeechFn = useServerFn(synthesizeSpeech);
   const recallKnowledgeFn = useServerFn(recallKnowledge);
   const logKnowledgeFn = useServerFn(logKnowledge);
+  const uploadPillarsFn = useServerFn(uploadPillars);
+  const retrievePillarsFn = useServerFn(retrievePillars);
+  const saveInteractionFn = useServerFn(saveInteraction);
+  const pillarsRef = useRef<any>({ identity: null, goals: null, relationships: [], knowledge: [] });
+  const [pillarStats, setPillarStats] = useState<any>(null);
+  const [uploadMsg, setUploadMsg] = useState<string>("");
 
 
   const color = STATE_COLORS[state] || "#00d4ff";
