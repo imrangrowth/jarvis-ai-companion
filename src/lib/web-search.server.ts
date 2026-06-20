@@ -12,16 +12,45 @@ export interface SearchResult {
 }
 
 /**
- * Search the web using Tavily API
- * Requires TAVILY_API_KEY in environment
+ * Search the web. Prefers Google Custom Search (GOOGLE_SEARCH_API_KEY + GOOGLE_SEARCH_CX),
+ * falls back to Tavily (TAVILY_API_KEY) if Google is not configured.
  */
 export async function performWebSearch(
   query: string,
   maxResults: number = 5
 ): Promise<SearchResult[]> {
-  const apiKey = process.env.TAVILY_API_KEY;
-  if (!apiKey) {
-    console.warn("TAVILY_API_KEY not set, web search unavailable");
+  const googleKey = process.env.GOOGLE_SEARCH_API_KEY;
+  const googleCx = process.env.GOOGLE_SEARCH_CX;
+
+  if (googleKey && googleCx) {
+    try {
+      const url = new URL("https://www.googleapis.com/customsearch/v1");
+      url.searchParams.set("key", googleKey);
+      url.searchParams.set("cx", googleCx);
+      url.searchParams.set("q", query);
+      url.searchParams.set("num", String(Math.min(maxResults, 10)));
+
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        console.error(`Google search failed: ${response.status}`);
+      } else {
+        const data = await response.json();
+        const items = (data.items || []).map((r: any) => ({
+          title: r.title,
+          url: r.link,
+          content: r.snippet || "",
+          snippet: r.snippet,
+        }));
+        if (items.length) return items;
+      }
+    } catch (error) {
+      console.error("Google search error:", error);
+    }
+  }
+
+  const tavilyKey = process.env.TAVILY_API_KEY;
+  if (!tavilyKey) {
+    console.warn("No web search API key configured (GOOGLE_SEARCH_API_KEY or TAVILY_API_KEY)");
     return [];
   }
 
@@ -30,7 +59,7 @@ export async function performWebSearch(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        api_key: apiKey,
+        api_key: tavilyKey,
         query,
         max_results: maxResults,
         include_answer: true,
